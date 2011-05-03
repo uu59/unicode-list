@@ -1,0 +1,133 @@
+<!DOCTYPE html> 
+<html>
+<head> 
+<title>unicode list</title> 
+<style>
+strong, em {
+  font-weight: normal;
+  font-style: normal;
+}
+#list {
+  padding: 2em;
+  font-size: 16pt;
+  line-height: 1.6;
+}
+#blocks form { display: inline; }
+#list span {
+  padding:3px;
+  margin:1ex;
+  border:1px solid #ccc;
+}
+#list span.me {
+  text-align: center;
+  font-size: 48pt;
+  display:block;
+  border:none;
+}
+#list span.me em {
+  font-size:24pt;
+  padding:0 3em;
+}
+#stage {
+  font-size: 48pt;
+}
+</style>
+</head> 
+<body>
+<div id="blocks">
+<select></select>
+<form>
+<input type="text" name="code" id="code" /><input type="button" id="jump" value="jump" />
+</form>
+</div>
+<div id="list"></div>
+<div id="stage"></div>
+<script src="http://ajax.aspnetcdn.com/ajax/jquery/jquery-1.5.1.min.js" type="text/javascript"></script>
+<script src="https://github.com/brandonaaron/jquery-mousewheel/raw/master/jquery.mousewheel.js" type="text/javascript"></script>
+<script>
+  var CURRENT = 0x2604;
+var BLOCKS=[];
+var xhr = new XMLHttpRequest();
+xhr.onreadystatechange=function(){
+  if(this.readyState == 4) {
+    var html = [];
+    $.each(this.responseText.split("\n"), function(no, line) {
+      if(line.match(/^([0-9A-F]+)\.\.([0-9A-F]+); (.*)/)){
+        var start = parseInt(RegExp.$1, 16);
+        var end = parseInt(RegExp.$2, 16);
+        var name = RegExp.$3;
+        BLOCKS.push([start, end]);
+        html.push('<option value="'+[start,end].join(",")+'">'+name+'('+(end-start)+')'+'</option>'); 
+      }
+    });
+    $('#blocks select').html(html.join(""));
+  }
+}
+xhr.open("GET", "http://allow-any-origin.appspot.com/http://unicode.org/Public/UNIDATA/Blocks.txt", false);
+xhr.send(null);
+
+$('select').live('change', function(){
+  var opt = $(this).val();
+  updateList(opt.split(",")[0]);
+});
+$('#blocks form').live('submit', function(ev){
+  ev.preventDefault();
+  var tmp = $('#code').val().replace(/^U\+/, "");
+  updateList(parseInt(tmp, 16));
+});
+$('#list span').live('click', function() {
+  updateList($(this).attr('code'));
+});
+$('#list').mousewheel(function(ev, delta, x, y){
+  ev.preventDefault();
+  var tmp = parseInt(CURRENT) + (delta > 0 ? -1 : +1);
+  updateList(tmp);
+});
+
+function updateList(center) {
+  var html = [];
+  var center = parseInt(center);
+  CURRENT = center;
+  $('#blocks input#code').val('U+'+CURRENT.toString(16));
+  for(var i=center-120; i<center+120; ++i) {
+    if(i < 0) continue;
+    if(i == center) {
+      html.push([
+        '<span class="me" title="U+'+i.toString(16)+'" code="'+i+'">',
+        '<em>U+'+i.toString(16)+'</em>',
+        '<strong>&#'+i+';</strong>',
+        '<em>&amp;#'+i+';</em>',
+        '</span> '
+      ].join(""));
+    }else{
+      html.push('<span title="U+'+i.toString(16)+'" code="'+i+'">&#'+i+';</span> ');
+    }
+  }
+  var limit = 50;
+  var bisearch = function(arr, min, max, code) {
+    --limit;
+    if(limit < 1) return [0,0];
+    var mid = Math.floor((min + max) / 2);
+    if(code < arr[mid][0]) {
+      max = mid - 1;
+    }else if(code > arr[mid][1]) {
+      min = mid + 1;
+    }else if(arr[mid][0] <= code && arr[mid][1] >= code) {
+      return arr[mid];
+    }
+    return bisearch(arr, min, max, code);
+  }
+  var block = bisearch(BLOCKS, 0, BLOCKS.length, center);
+  location.hash = '#U+'+center.toString(16);
+  $('#blocks select').val(block.join(","));
+  $('#list').html(html.join(""));
+}
+if(location.hash) {
+  var tmp= parseInt(location.hash.slice(3), 16);
+  if(!isNaN(tmp)) {
+    CURRENT = tmp;
+  }
+}
+updateList(CURRENT);
+</script>
+</body></html> 
